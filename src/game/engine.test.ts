@@ -6,6 +6,7 @@ import {
   createView,
   passPending,
   playCard,
+  playCardAs,
   respondToPending,
   startHeroSelect
 } from "./engine";
@@ -65,6 +66,70 @@ describe("identity card engine", () => {
     expect(target.hp).toBe(1);
     expect(target.alive).toBe(true);
     expect(game.phase).toBe("playing");
+  });
+
+  it("does not force Guan Yu red cards to become strike when using the printed card", () => {
+    const game = setupGame(2);
+    const source = activePlayer(game);
+    const target = firstEnemy(game, source.id);
+    source.heroId = "guan-yu";
+    const redDismantle = testCard("dismantle", "过河拆桥", "heart");
+    const targetCard = testCard("dodge", "闪");
+    source.hand.push(redDismantle);
+    target.hand.push(targetCard);
+    const targetHp = target.hp;
+    const targetHandBefore = target.hand.length;
+
+    playCard(game, source.id, redDismantle.id, target.id);
+
+    expect(game.pending).toBe(null);
+    expect(target.hp).toBe(targetHp);
+    expect(target.hand.length).toBe(targetHandBefore - 1);
+  });
+
+  it("lets Guan Yu explicitly convert a red card into strike", () => {
+    const game = setupGame(2);
+    const source = activePlayer(game);
+    const target = firstEnemy(game, source.id);
+    source.heroId = "guan-yu";
+    const redDismantle = testCard("dismantle", "过河拆桥", "heart");
+    source.hand.push(redDismantle);
+
+    playCardAs(game, source.id, redDismantle.id, "strike", target.id);
+
+    expect(game.pending?.kind).toBe("dodge");
+  });
+
+  it("keeps Hua Tuo red trick cards as their printed trick unless explicitly converted", () => {
+    const game = setupGame(2);
+    const source = activePlayer(game);
+    source.heroId = "hua-tuo";
+    source.hp = source.maxHp - 1;
+    const redDraw = testCard("draw_two", "无中生有", "heart");
+    source.hand.push(redDraw);
+    const hpBefore = source.hp;
+
+    playCard(game, source.id, redDraw.id);
+
+    expect(source.hp).toBe(hpBefore);
+    expect(game.pending).toBe(null);
+  });
+
+  it("lets Zhang Fei use more than one strike in the same play stage", () => {
+    const game = setupGame(2);
+    const source = activePlayer(game);
+    const target = firstEnemy(game, source.id);
+    source.heroId = "zhang-fei";
+    const firstStrike = testCard("strike", "杀");
+    const secondStrike = testCard("strike", "杀");
+    source.hand.push(firstStrike, secondStrike);
+
+    playCard(game, source.id, firstStrike.id, target.id);
+    passPending(game, target.id);
+    playCard(game, source.id, secondStrike.id, target.id);
+
+    expect(game.pending?.kind).toBe("dodge");
+    expect(source.strikesUsed).toBe(2);
   });
 });
 

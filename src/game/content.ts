@@ -1,4 +1,4 @@
-import type { CardDef, GameModeId, GameModeInfo, HeroDef, RoleId } from "./types";
+import type { CardDef, GameModeId, GameModeInfo, HeroDef, HeroSkillKind, RoleId } from "./types";
 
 export const ROLE_LABELS: Record<RoleId, string> = {
   lord: "主公",
@@ -123,6 +123,12 @@ export const KINGDOM_COLORS = {
   qun: "#8e5a9d"
 } as const;
 
+export const SKILL_KIND_LABELS: Record<HeroSkillKind, string> = {
+  active: "主动技",
+  passive: "被动技",
+  conversion: "转换技"
+};
+
 export const ROLE_SETS: Record<number, RoleId[]> = {
   2: ["lord", "rebel"],
   3: ["lord", "rebel", "renegade"],
@@ -141,6 +147,7 @@ export const HEROES: HeroDef[] = [
     kingdom: "wei",
     maxHp: 4,
     skillName: "归略",
+    skillKind: "passive",
     skillText: "每次受到伤害后，若仍存活，摸一张牌。",
     quote: "乱世之局，先握在手中。"
   },
@@ -151,6 +158,7 @@ export const HEROES: HeroDef[] = [
     kingdom: "shu",
     maxHp: 4,
     skillName: "仁望",
+    skillKind: "active",
     skillText: "出牌阶段限一次：弃一张牌，令一名受伤角色回复 1 点体力。",
     quote: "同袍在侧，方有山河。"
   },
@@ -161,6 +169,7 @@ export const HEROES: HeroDef[] = [
     kingdom: "wu",
     maxHp: 4,
     skillName: "衡策",
+    skillKind: "active",
     skillText: "出牌阶段限一次：弃任意张手牌，然后摸等量的牌。",
     quote: "权衡一瞬，江潮改道。"
   },
@@ -171,6 +180,7 @@ export const HEROES: HeroDef[] = [
     kingdom: "shu",
     maxHp: 4,
     skillName: "赤锋",
+    skillKind: "conversion",
     skillText: "你可以将一张红色手牌当作【杀】使用。",
     quote: "赤胆向前，刀光不回。"
   },
@@ -181,6 +191,7 @@ export const HEROES: HeroDef[] = [
     kingdom: "shu",
     maxHp: 4,
     skillName: "长喝",
+    skillKind: "passive",
     skillText: "你的出牌阶段使用【杀】没有次数限制。",
     quote: "战鼓未停，谁敢后退。"
   },
@@ -191,6 +202,7 @@ export const HEROES: HeroDef[] = [
     kingdom: "shu",
     maxHp: 4,
     skillName: "游龙",
+    skillKind: "conversion",
     skillText: "你可以将【闪】当作【杀】使用，也可以将【杀】当作【闪】响应。",
     quote: "枪影所至，进退皆路。"
   },
@@ -201,6 +213,7 @@ export const HEROES: HeroDef[] = [
     kingdom: "wu",
     maxHp: 3,
     skillName: "英姿",
+    skillKind: "passive",
     skillText: "摸牌阶段额外摸一张牌。",
     quote: "风起江面，火照连营。"
   },
@@ -211,6 +224,7 @@ export const HEROES: HeroDef[] = [
     kingdom: "qun",
     maxHp: 3,
     skillName: "青囊",
+    skillKind: "conversion",
     skillText: "你可以将一张红色手牌当作【桃】使用或救援。",
     quote: "一线生机，也值得争。"
   }

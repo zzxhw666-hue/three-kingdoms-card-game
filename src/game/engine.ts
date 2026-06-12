@@ -1,6 +1,7 @@
 import { CARDS, GAME_MODES, HEROES, ROLE_SETS, getCardDef, getHero, getModeForPlayerCount, getRoleLabel } from "./content";
 import type {
   AoePending,
+  CardUseAs,
   CardColor,
   CardSuit,
   EquipmentSlot,
@@ -165,13 +166,14 @@ export function playCard(game: GameState, playerId: PlayerId, cardId: string, ta
   const player = requirePlayer(game, playerId);
   const card = requireHandCard(player, cardId);
 
-  // 武将转换牌在服务端判定，前端只负责发“我想用这张牌”的意图。
-  if (targetId && canUseCardAs(game, player, card, "strike")) {
+  // 普通出牌只按牌面原本含义结算。转换技必须走 playCardAs，避免红色锦囊被关羽误当【杀】。
+  if (card.key === "strike") {
+    assert(typeof targetId === "string" && targetId.length > 0, "使用【杀】需要选择目标。");
     playStrike(game, player, card, targetId);
     return;
   }
 
-  if (card.key === "peach" || canUseCardAs(game, player, card, "peach")) {
+  if (card.key === "peach") {
     assert(!targetId || targetId === playerId, "【桃】只能给自己使用。");
     assert(player.hp < player.maxHp, "体力已满，不需要使用【桃】。");
     removeCardsFromHand(player, [card.id]);
@@ -216,6 +218,31 @@ export function playCard(game: GameState, playerId: PlayerId, cardId: string, ta
     default:
       throw new GameRuleError("这张牌当前不能主动使用。");
   }
+}
+
+export function playCardAs(game: GameState, playerId: PlayerId, cardId: string, as: CardUseAs, targetId?: PlayerId) {
+  assertCanActInPlayStage(game, playerId);
+  const player = requirePlayer(game, playerId);
+  const card = requireHandCard(player, cardId);
+  assert(card.key !== as, "这张牌本身就是该牌名，请直接使用。");
+  assert(canUseCardAs(game, player, card, as), "你的武将不能这样转换这张牌。");
+
+  if (as === "strike") {
+    assert(typeof targetId === "string" && targetId.length > 0, "当【杀】使用需要选择目标。");
+    playStrike(game, player, card, targetId);
+    return;
+  }
+
+  if (as === "peach") {
+    assert(!targetId || targetId === playerId, "【桃】只能给自己使用。");
+    assert(player.hp < player.maxHp, "体力已满，不需要使用【桃】。");
+    removeCardsFromHand(player, [card.id]);
+    discardCards(game, [card]);
+    healPlayer(game, player.id, 1, `${player.name} 将【${card.name}】当【桃】使用，回复 1 点体力。`);
+    return;
+  }
+
+  throw new GameRuleError("出牌阶段不能主动当【闪】使用。");
 }
 
 export function useHeroSkill(game: GameState, playerId: PlayerId, cardIds: string[], targetId?: PlayerId) {

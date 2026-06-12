@@ -22,12 +22,13 @@ import {
   HEROES,
   KINGDOM_COLORS,
   KINGDOM_LABELS,
+  SKILL_KIND_LABELS,
   getHero,
   getModeForPlayerCount,
   getRoleGoal,
   getRoleLabel
 } from "./game/content";
-import type { GameCard, GameView, PendingAction, PlayerId, PublicPlayerView } from "./game/types";
+import type { CardUseAs, GameCard, GameView, PendingAction, PlayerId, PublicPlayerView } from "./game/types";
 
 type ServerMessage =
   | { type: "joined"; roomCode: string; playerId: PlayerId }
@@ -273,6 +274,16 @@ function GameShell(props: GameShellProps) {
     });
   }
 
+  function playSelectedCardAs(as: CardUseAs) {
+    if (!selectedCard) return;
+    props.onAction({
+      type: "playCardAs",
+      cardId: selectedCard.id,
+      as,
+      targetId: targetId ?? undefined
+    });
+  }
+
   function useSkill() {
     props.onAction({
       type: "useSkill",
@@ -395,6 +406,7 @@ function GameShell(props: GameShellProps) {
               isMyDiscard={isMyDiscard}
               discardNeed={discardNeed}
               onPlay={playSelectedCard}
+              onPlayAs={playSelectedCardAs}
               onSkill={useSkill}
               onRespond={respond}
               onPass={() => props.onAction({ type: "passPending" })}
@@ -478,6 +490,7 @@ function HeroSelect({ view, onAction }: { view: GameView; onAction: (action: Rec
               <strong>{hero.name}</strong>
               <em>{hero.title}</em>
               <p>{hero.skillName}：{hero.skillText}</p>
+              <small>{SKILL_KIND_LABELS[hero.skillKind]}</small>
             </button>
           );
         })}
@@ -504,7 +517,10 @@ function RolePanel({ view }: { view: GameView }) {
       <p>{getRoleGoal(role, view.mode.id)}</p>
       {hero && (
         <div className="skill-box">
-          <strong>{hero.name} · {hero.skillName}</strong>
+          <strong>
+            {hero.name} · {hero.skillName}
+            <em>{SKILL_KIND_LABELS[hero.skillKind]}</em>
+          </strong>
           <span>{hero.skillText}</span>
         </div>
       )}
@@ -644,6 +660,7 @@ function ActionBar(props: {
   isMyDiscard: boolean;
   discardNeed: number;
   onPlay: () => void;
+  onPlayAs: (as: CardUseAs) => void;
   onSkill: () => void;
   onRespond: () => void;
   onPass: () => void;
@@ -652,6 +669,7 @@ function ActionBar(props: {
 }) {
   const selectedCount = props.selectedCards.length;
   const pending = props.view.pending;
+  const selectedCard = props.selectedCards[0] ?? null;
   const canRespond = Boolean(pending && selectedCount === 1 && canSelfRespond(props.view, pending));
   const canPass = Boolean(pending && canSelfRespond(props.view, pending, true));
   const canUseActiveSkill =
@@ -659,6 +677,19 @@ function ActionBar(props: {
     !props.view.self.skillUsed &&
     (props.view.self.heroId === "liu-bei" || props.view.self.heroId === "sun-quan") &&
     selectedCount > 0;
+  const canPlayAsStrike = Boolean(
+    props.isMyTurn &&
+      selectedCard &&
+      selectedCard.key !== "strike" &&
+      canConvertCardAs(props.view.self.heroId, selectedCard, "strike")
+  );
+  const canPlayAsPeach = Boolean(
+    props.isMyTurn &&
+      selectedCard &&
+      selectedCard.key !== "peach" &&
+      props.view.self.hp < props.view.self.maxHp &&
+      canConvertCardAs(props.view.self.heroId, selectedCard, "peach")
+  );
 
   if (props.view.phase === "finished") {
     return (
@@ -676,11 +707,19 @@ function ActionBar(props: {
         <>
           <button className="primary-button" type="button" disabled={selectedCount !== 1} onClick={props.onPlay}>
             <Swords aria-hidden="true" />
-            使用选中牌
+            按牌面使用
+          </button>
+          <button className="secondary-button" type="button" disabled={!canPlayAsStrike} onClick={() => props.onPlayAs("strike")}>
+            <Swords aria-hidden="true" />
+            当杀使用
+          </button>
+          <button className="secondary-button" type="button" disabled={!canPlayAsPeach} onClick={() => props.onPlayAs("peach")}>
+            <HeartPulse aria-hidden="true" />
+            当桃使用
           </button>
           <button className="secondary-button" type="button" disabled={!canUseActiveSkill} onClick={props.onSkill}>
             <Sparkles aria-hidden="true" />
-            发动技能
+            发动主动技
           </button>
           <button className="ghost-button" type="button" onClick={props.onEndPlay}>
             <SkipForward aria-hidden="true" />
@@ -719,6 +758,16 @@ function StatusPill({ status }: { status: string }) {
       {status === "connected" ? "在线" : status === "connecting" ? "连接中" : "离线"}
     </span>
   );
+}
+
+function canConvertCardAs(heroId: string | null, card: GameCard, as: CardUseAs) {
+  if (as === "strike" && heroId === "guan-yu" && card.color === "red") return true;
+  if (heroId === "zhao-yun") {
+    if (as === "strike" && card.key === "dodge") return true;
+    if (as === "dodge" && card.key === "strike") return true;
+  }
+  if (as === "peach" && heroId === "hua-tuo" && card.color === "red") return true;
+  return false;
 }
 
 function canSelfRespond(view: GameView, pending: PendingAction, allowPass = false) {

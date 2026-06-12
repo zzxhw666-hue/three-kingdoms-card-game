@@ -439,6 +439,18 @@ p {
   font-style: normal;
 }
 
+.hero-option small,
+.skill-box em {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: #241812;
+  background: #ffe1a8;
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 900;
+}
+
 .hero-option p,
 .role-card p,
 .lobby-hero p,
@@ -484,6 +496,13 @@ p {
   border-radius: 8px;
   color: #243b2f;
   background: #d9ead7;
+}
+
+.skill-box strong {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .skill-box span,

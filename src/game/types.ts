@@ -8,6 +8,8 @@ export type CardSuit = "spade" | "heart" | "club" | "diamond";
 export type CardColor = "red" | "black";
 export type CardType = "basic" | "trick" | "equip";
 export type EquipmentSlot = "weapon" | "armor";
+export type HeroSkillKind = "active" | "passive" | "conversion";
+export type CardUseAs = "strike" | "dodge" | "peach";
 
 export interface HeroDef {
   id: string;
@@ -16,6 +18,7 @@ export interface HeroDef {
   kingdom: KingdomId;
   maxHp: number;
   skillName: string;
+  skillKind: HeroSkillKind;
   skillText: string;
   quote: string;
 }

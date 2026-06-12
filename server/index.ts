@@ -14,12 +14,13 @@ import {
   markPlayerOffline,
   passPending,
   playCard,
+  playCardAs,
   resetToLobby,
   respondToPending,
   startHeroSelect,
   useHeroSkill
 } from "../src/game/engine";
-import type { GameState, PlayerId } from "../src/game/types";
+import type { CardUseAs, GameState, PlayerId } from "../src/game/types";
 
 type ClientMessage =
   | { type: "createRoom"; playerId: PlayerId; name: string }
@@ -27,6 +28,7 @@ type ClientMessage =
   | { type: "startGame" }
   | { type: "chooseHero"; heroId: string }
   | { type: "playCard"; cardId: string; targetId?: PlayerId }
+  | { type: "playCardAs"; cardId: string; as: CardUseAs; targetId?: PlayerId }
   | { type: "useSkill"; cardIds: string[]; targetId?: PlayerId }
   | { type: "respond"; cardId: string }
   | { type: "passPending" }
@@ -115,6 +117,9 @@ wss.on("connection", (socket) => {
           break;
         case "playCard":
           playCard(room.game, playerId, message.cardId, message.targetId);
+          break;
+        case "playCardAs":
+          playCardAs(room.game, playerId, message.cardId, message.as, message.targetId);
           break;
         case "useSkill":
           useHeroSkill(room.game, playerId, message.cardIds, message.targetId);
