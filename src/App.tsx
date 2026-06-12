@@ -33,7 +33,8 @@ import type { CardUseAs, GameCard, GameView, PendingAction, PlayerId, PublicPlay
 type ServerMessage =
   | { type: "joined"; roomCode: string; playerId: PlayerId }
   | { type: "state"; view: GameView }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "kicked"; message: string };
 
 const PLAYER_ID_KEY = "kingdom-card:player-id";
 const PLAYER_NAME_KEY = "kingdom-card:name";
@@ -91,6 +92,12 @@ export function App() {
       }
       if (message.type === "error") {
         setToast(message.message);
+      }
+      if (message.type === "kicked") {
+        setToast(message.message);
+        setView(null);
+        window.location.hash = "";
+        socket.close();
       }
     };
 
@@ -307,6 +314,7 @@ function GameShell(props: GameShellProps) {
         <div className="top-actions">
           <StatusPill status={props.status} />
           <span className="mode-pill">{view.mode.shortName}</span>
+          <DeadlinePill view={view} />
           <button
             className="icon-button"
             type="button"
@@ -337,6 +345,7 @@ function GameShell(props: GameShellProps) {
 
             <section className="battlefield">
               <PendingBanner pending={view.pending} players={view.players} selfId={view.selfId} />
+              <EffectLayer view={view} />
               <div className={`players-grid players-${view.players.length}`}>
                 {view.players.map((player) => (
                   <PlayerSeat
@@ -402,6 +411,7 @@ function GameShell(props: GameShellProps) {
             <ActionBar
               view={view}
               selectedCards={selectedCards}
+              targetId={targetId}
               isMyTurn={isMyTurn}
               isMyDiscard={isMyDiscard}
               discardNeed={discardNeed}
@@ -461,6 +471,7 @@ function Lobby({ view, onAction }: { view: GameView; onAction: (action: Record<s
 
 function HeroSelect({ view, onAction }: { view: GameView; onAction: (action: Record<string, unknown>) => void }) {
   const role = view.self.role;
+  const takenHeroIds = new Set(view.players.map((player) => player.heroId).filter((heroId): heroId is string => Boolean(heroId)));
   return (
     <section className="hero-select-layout">
       <div className="role-card">
@@ -478,11 +489,13 @@ function HeroSelect({ view, onAction }: { view: GameView; onAction: (action: Rec
           const hero = getHero(heroId);
           if (!hero) return null;
           const selected = view.self.heroId === hero.id;
+          const takenByOther = takenHeroIds.has(hero.id) && !selected;
           return (
             <button
               key={hero.id}
-              className={selected ? "hero-option selected" : "hero-option"}
+              className={["hero-option", selected ? "selected" : "", takenByOther ? "taken" : ""].filter(Boolean).join(" ")}
               type="button"
+              disabled={takenByOther || Boolean(view.self.heroId)}
               style={{ "--kingdom": KINGDOM_COLORS[hero.kingdom] } as CSSProperties}
               onClick={() => onAction({ type: "chooseHero", heroId: hero.id })}
             >
@@ -491,6 +504,7 @@ function HeroSelect({ view, onAction }: { view: GameView; onAction: (action: Rec
               <em>{hero.title}</em>
               <p>{hero.skillName}：{hero.skillText}</p>
               <small>{SKILL_KIND_LABELS[hero.skillKind]}</small>
+              {takenByOther && <b>已被选择</b>}
             </button>
           );
         })}
@@ -617,7 +631,10 @@ function PendingBanner({ pending, players, selfId }: { pending: PendingAction | 
 
   const nameOf = (id: PlayerId) => players.find((player) => player.id === id)?.name ?? "未知角色";
   let text = "";
-  if (pending.kind === "dodge") text = `${nameOf(pending.targetId)} 需要出【闪】响应 ${nameOf(pending.sourceId)} 的【杀】。`;
+  if (pending.kind === "dodge") {
+    const remaining = Math.max(1, pending.required - pending.received);
+    text = `${nameOf(pending.targetId)} 需要出 ${remaining} 张【闪】响应 ${nameOf(pending.sourceId)} 的【杀】。`;
+  }
   if (pending.kind === "duel") text = `${nameOf(pending.currentResponderId)} 需要在【决斗】中打出【杀】。`;
   if (pending.kind === "aoe") {
     const targetId = pending.targetIds[pending.index];
@@ -639,6 +656,39 @@ function PendingBanner({ pending, players, selfId }: { pending: PendingAction | 
   );
 }
 
+function EffectLayer({ view }: { view: GameView }) {
+  const lastEffectId = useRef<string | null>(null);
+  const [visible, setVisible] = useState(false);
+  const effect = view.latestEffect;
+
+  useEffect(() => {
+    if (!effect || effect.id === lastEffectId.current) return;
+    lastEffectId.current = effect.id;
+    setVisible(true);
+    const timer = window.setTimeout(() => setVisible(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [effect?.id]);
+
+  if (!effect || !visible) return null;
+  const source = effect.sourceId ? view.players.find((player) => player.id === effect.sourceId) : null;
+  const target = effect.targetId ? view.players.find((player) => player.id === effect.targetId) : null;
+  return (
+    <div className={`effect-burst ${effect.kind}`} key={effect.id}>
+      <span>{source ? source.name : "全场"}{target && target.id !== source?.id ? ` → ${target.name}` : ""}</span>
+      <strong>{effect.title}</strong>
+      <em>{effect.text}</em>
+    </div>
+  );
+}
+
+function DeadlinePill({ view }: { view: GameView }) {
+  const deadline = view.phase === "heroSelect" ? view.heroSelectEndsAt : view.actionDeadlineAt;
+  const seconds = useCountdownSeconds(deadline);
+  if (seconds === null) return null;
+  const label = view.phase === "heroSelect" ? "选将" : view.pending ? "响应" : view.stage === "discard" ? "弃牌" : "出牌";
+  return <span className={seconds <= 3 ? "deadline-pill urgent" : "deadline-pill"}>{label} {seconds}s</span>;
+}
+
 function HandCard({ card, selected, onClick }: { card: GameCard; selected: boolean; onClick: (event: React.MouseEvent) => void }) {
   return (
     <button className={selected ? "hand-card selected" : "hand-card"} type="button" onClick={onClick}>
@@ -656,6 +706,7 @@ function HandCard({ card, selected, onClick }: { card: GameCard; selected: boole
 function ActionBar(props: {
   view: GameView;
   selectedCards: GameCard[];
+  targetId: PlayerId | null;
   isMyTurn: boolean;
   isMyDiscard: boolean;
   discardNeed: number;
@@ -672,11 +723,7 @@ function ActionBar(props: {
   const selectedCard = props.selectedCards[0] ?? null;
   const canRespond = Boolean(pending && selectedCount === 1 && canSelfRespond(props.view, pending));
   const canPass = Boolean(pending && canSelfRespond(props.view, pending, true));
-  const canUseActiveSkill =
-    props.isMyTurn &&
-    !props.view.self.skillUsed &&
-    (props.view.self.heroId === "liu-bei" || props.view.self.heroId === "sun-quan") &&
-    selectedCount > 0;
+  const canUseActiveSkill = props.isMyTurn && !props.view.self.skillUsed && canUseSelectedActiveSkill(props.view, props.selectedCards, props.targetId);
   const canPlayAsStrike = Boolean(
     props.isMyTurn &&
       selectedCard &&
@@ -768,6 +815,33 @@ function canConvertCardAs(heroId: string | null, card: GameCard, as: CardUseAs) 
   }
   if (as === "peach" && heroId === "hua-tuo" && card.color === "red") return true;
   return false;
+}
+
+function canUseSelectedActiveSkill(view: GameView, selectedCards: GameCard[], targetId: PlayerId | null) {
+  const heroId = view.self.heroId;
+  const selectedCount = selectedCards.length;
+  const target = targetId ? view.players.find((player) => player.id === targetId && player.id !== view.selfId && player.alive) : null;
+  if (heroId === "liu-bei") return selectedCount === 1 && Boolean(target && target.hp < target.maxHp);
+  if (heroId === "sun-quan") return selectedCount > 0;
+  if (heroId === "zhang-liao") return selectedCount === 0 && Boolean(target);
+  if (heroId === "sima-yi") return selectedCount === 1 && selectedCards[0].color === "black";
+  if (heroId === "diao-chan") return selectedCount === 1 && Boolean(target);
+  if (heroId === "xu-chu") return selectedCount === 2;
+  return false;
+}
+
+function useCountdownSeconds(deadlineAt: number | null) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!deadlineAt) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [deadlineAt]);
+
+  if (!deadlineAt) return null;
+  return Math.max(0, Math.ceil((deadlineAt - now) / 1000));
 }
 
 function canSelfRespond(view: GameView, pending: PendingAction, allowPass = false) {

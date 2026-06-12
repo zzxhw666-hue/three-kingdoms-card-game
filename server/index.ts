@@ -15,8 +15,12 @@ import {
   passPending,
   playCard,
   playCardAs,
+  refreshActionDeadline,
+  removePlayer,
   resetToLobby,
+  resolveTimedAction,
   respondToPending,
+  restartHeroSelect,
   startHeroSelect,
   useHeroSkill
 } from "../src/game/engine";
@@ -35,6 +39,12 @@ type ClientMessage =
   | { type: "endPlay" }
   | { type: "discard"; cardIds: string[] }
   | { type: "resetToLobby" };
+
+type ServerMessage =
+  | { type: "joined"; roomCode: string; playerId: PlayerId }
+  | { type: "state"; view: ReturnType<typeof createView> }
+  | { type: "error"; message: string }
+  | { type: "kicked"; message: string };
 
 interface RoomRecord {
   game: GameState;
@@ -143,6 +153,7 @@ wss.on("connection", (socket) => {
           throw new GameRuleError("未知指令。");
       }
 
+      refreshActionDeadline(room.game);
       broadcast(attachedRoomCode);
     } catch (error) {
       const message = error instanceof Error ? error.message : "操作失败。";
@@ -165,6 +176,18 @@ wss.on("connection", (socket) => {
 server.listen(port, "0.0.0.0", () => {
   console.log(`群雄牌局已启动：http://localhost:${port}`);
 });
+
+setInterval(() => {
+  rooms.forEach((room, roomCode) => {
+    try {
+      const changed = handleHeroSelectTimeout(roomCode, room) || resolveTimedAction(room.game);
+      if (changed) broadcast(roomCode);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "计时器处理失败。";
+      console.error(`[${roomCode}] timer error: ${message}`);
+    }
+  });
+}, 500);
 
 function attachSocket(roomCode: string, playerId: PlayerId, socket: WebSocket) {
   const room = rooms.get(roomCode);
@@ -194,10 +217,36 @@ function broadcast(roomCode: string | null) {
   });
 }
 
-function send(socket: WebSocket, data: unknown) {
+function send(socket: WebSocket, data: ServerMessage) {
   if (socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify(data));
   }
+}
+
+function handleHeroSelectTimeout(roomCode: string, room: RoomRecord) {
+  const game = room.game;
+  if (game.phase !== "heroSelect" || !game.heroSelectEndsAt || Date.now() < game.heroSelectEndsAt) return false;
+  const timedOutIds = game.playerOrder.filter((id) => !game.players[id].heroId);
+  if (timedOutIds.length === 0) return false;
+
+  timedOutIds.forEach((playerId) => {
+    const socket = room.sockets.get(playerId);
+    if (socket) {
+      send(socket, { type: "kicked", message: "选将超时，已被移出房间。" });
+      room.sockets.delete(playerId);
+      socket.close();
+    }
+    removePlayer(game, playerId, "选将超时，被移出房间。");
+  });
+
+  if (game.phase === "heroSelect" && game.playerOrder.length >= 2) {
+    restartHeroSelect(game, "有人选将超时，已重新发放身份和武将。");
+  }
+
+  if (game.playerOrder.length === 0) {
+    rooms.delete(roomCode);
+  }
+  return true;
 }
 
 function createRoomCode() {

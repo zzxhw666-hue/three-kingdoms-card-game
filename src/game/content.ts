@@ -227,6 +227,138 @@ export const HEROES: HeroDef[] = [
     skillKind: "conversion",
     skillText: "你可以将一张红色手牌当作【桃】使用或救援。",
     quote: "一线生机，也值得争。"
+  },
+  {
+    id: "xiahou-dun",
+    name: "夏侯惇",
+    title: "独目刚侯",
+    kingdom: "wei",
+    maxHp: 4,
+    skillName: "刚烈",
+    skillKind: "passive",
+    skillText: "你受到伤害后，伤害来源随机弃一张牌；若其无牌，则受到 1 点反伤。",
+    quote: "伤我一分，必还一寸。"
+  },
+  {
+    id: "zhang-liao",
+    name: "张辽",
+    title: "合肥破军",
+    kingdom: "wei",
+    maxHp: 4,
+    skillName: "突袭",
+    skillKind: "active",
+    skillText: "出牌阶段限一次：获得一名其他角色的一张随机手牌。",
+    quote: "敌阵稍乱，便是破口。"
+  },
+  {
+    id: "sima-yi",
+    name: "司马懿",
+    title: "狼顾深谋",
+    kingdom: "wei",
+    maxHp: 3,
+    skillName: "筹策",
+    skillKind: "active",
+    skillText: "出牌阶段限一次：弃一张黑色手牌，然后摸两张牌。",
+    quote: "胜负未定，先藏一手。"
+  },
+  {
+    id: "zhuge-liang",
+    name: "诸葛亮",
+    title: "卧龙观星",
+    kingdom: "shu",
+    maxHp: 3,
+    skillName: "观势",
+    skillKind: "passive",
+    skillText: "回合开始摸牌时，若你的手牌不多于 1 张，额外摸一张牌。",
+    quote: "风来之前，星已先动。"
+  },
+  {
+    id: "ma-chao",
+    name: "马超",
+    title: "西凉铁骑",
+    kingdom: "shu",
+    maxHp: 4,
+    skillName: "铁骑",
+    skillKind: "passive",
+    skillText: "你每回合第一张【杀】直接命中，目标不能打出【闪】响应。",
+    quote: "铁骑踏阵，不问归路。"
+  },
+  {
+    id: "huang-yueying",
+    name: "黄月英",
+    title: "机巧才女",
+    kingdom: "shu",
+    maxHp: 3,
+    skillName: "集智",
+    skillKind: "passive",
+    skillText: "你使用锦囊牌后摸一张牌。",
+    quote: "巧思一转，局势便活。"
+  },
+  {
+    id: "lv-bu",
+    name: "吕布",
+    title: "飞将无双",
+    kingdom: "qun",
+    maxHp: 4,
+    skillName: "无双",
+    skillKind: "passive",
+    skillText: "你使用【杀】时，目标需要连续打出两张【闪】才能避开。",
+    quote: "一骑当先，万夫莫近。"
+  },
+  {
+    id: "diao-chan",
+    name: "貂蝉",
+    title: "月下连环",
+    kingdom: "qun",
+    maxHp: 3,
+    skillName: "离策",
+    skillKind: "active",
+    skillText: "出牌阶段限一次：弃一张手牌，令一名其他角色受到 1 点伤害。",
+    quote: "一念离间，满座风波。"
+  },
+  {
+    id: "xu-chu",
+    name: "许褚",
+    title: "虎痴鏖战",
+    kingdom: "wei",
+    maxHp: 4,
+    skillName: "裸衣",
+    skillKind: "active",
+    skillText: "出牌阶段限一次：弃两张手牌，本回合下一张【杀】伤害 +1。",
+    quote: "卸甲而战，更见锋芒。"
+  },
+  {
+    id: "sun-shangxiang",
+    name: "孙尚香",
+    title: "弓腰姬",
+    kingdom: "wu",
+    maxHp: 3,
+    skillName: "枭姬",
+    skillKind: "passive",
+    skillText: "你装备一张牌后摸一张牌。",
+    quote: "弓弦轻响，江东不让。"
+  },
+  {
+    id: "lu-xun",
+    name: "陆逊",
+    title: "儒将连营",
+    kingdom: "wu",
+    maxHp: 3,
+    skillName: "连营",
+    skillKind: "passive",
+    skillText: "你的手牌因使用或打出而变为 0 张时，摸一张牌。",
+    quote: "营火不绝，后势自来。"
+  },
+  {
+    id: "zhen-ji",
+    name: "甄姬",
+    title: "洛水凌波",
+    kingdom: "wei",
+    maxHp: 3,
+    skillName: "倾影",
+    skillKind: "conversion",
+    skillText: "你可以将一张黑色手牌当作【闪】响应。",
+    quote: "影落洛水，杀意无痕。"
   }
 ];
 
@@ -255,6 +387,14 @@ export const CARDS: CardDef[] = [
     target: "self",
     count: 10,
     description: "出牌阶段令自己回复 1 点体力；也可在角色濒死时救援。"
+  },
+  {
+    key: "wine",
+    name: "烈酒",
+    type: "basic",
+    target: "self",
+    count: 6,
+    description: "出牌阶段使用，本回合下一张【杀】伤害 +1。"
   },
 
   // 锦囊牌：用较少的文字保留“拆、牵、摸、决斗、群体响应”的桌游味道。
@@ -314,8 +454,40 @@ export const CARDS: CardDef[] = [
     count: 2,
     description: "所有存活角色各回复 1 点体力。"
   },
+  {
+    key: "harvest",
+    name: "丰年祭",
+    type: "trick",
+    target: "allOthers",
+    count: 3,
+    description: "所有存活角色各摸一张牌。"
+  },
+  {
+    key: "fire_attack",
+    name: "火计",
+    type: "trick",
+    target: "singleAny",
+    count: 3,
+    description: "指定一名其他角色；若其有牌，随机弃其一张牌，否则其受到 1 点伤害。"
+  },
+  {
+    key: "reinforce",
+    name: "整军",
+    type: "trick",
+    target: "self",
+    count: 4,
+    description: "摸一张牌；若你已受伤，再回复 1 点体力。"
+  },
+  {
+    key: "raid",
+    name: "奇袭",
+    type: "trick",
+    target: "singleEnemy",
+    count: 3,
+    description: "令一名其他角色随机弃一张手牌，然后你摸一张牌。"
+  },
 
-  // 装备牌：第一版只保留武器距离和连击感，避免把判定牌系统一次做得过重。
+  // 装备牌：保留武器距离、连击、破甲和防具减伤，适合轻量联机对局。
   {
     key: "halberd",
     name: "长兵",
@@ -337,6 +509,26 @@ export const CARDS: CardDef[] = [
     description: "装备后你的【杀】没有次数限制。"
   },
   {
+    key: "longbow",
+    name: "劲弓",
+    type: "equip",
+    target: "self",
+    equipmentSlot: "weapon",
+    range: 3,
+    count: 2,
+    description: "装备后攻击范围为 3。"
+  },
+  {
+    key: "pierce_blade",
+    name: "破甲刃",
+    type: "equip",
+    target: "self",
+    equipmentSlot: "weapon",
+    range: 2,
+    count: 2,
+    description: "装备后攻击范围为 2；你的【杀】造成伤害时无视防具减伤。"
+  },
+  {
     key: "war_armor",
     name: "明光铠",
     type: "equip",
@@ -344,6 +536,15 @@ export const CARDS: CardDef[] = [
     equipmentSlot: "armor",
     count: 2,
     description: "装备后每回合第一次受到伤害时少受 1 点；第一版按简化防具处理。"
+  },
+  {
+    key: "guard_armor",
+    name: "护心镜",
+    type: "equip",
+    target: "self",
+    equipmentSlot: "armor",
+    count: 2,
+    description: "装备后第一次受到锦囊伤害时少受 1 点；按简化防具处理。"
   }
 ];
 

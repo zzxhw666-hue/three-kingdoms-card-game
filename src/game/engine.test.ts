@@ -7,8 +7,11 @@ import {
   passPending,
   playCard,
   playCardAs,
+  refreshActionDeadline,
   respondToPending,
-  startHeroSelect
+  resolveTimedAction,
+  startHeroSelect,
+  useHeroSkill
 } from "./engine";
 import type { GameCard, GameState, PlayerState } from "./types";
 
@@ -32,6 +35,18 @@ describe("identity card engine", () => {
     expect(game.players.p2.role).toBe("rebel");
   });
 
+  it("prevents players from choosing the same hero in one game", () => {
+    const game = createGame("TEST");
+    addOrReconnectPlayer(game, "p1", "玩家1");
+    addOrReconnectPlayer(game, "p2", "玩家2");
+    startHeroSelect(game, "p1");
+    const heroId = game.players.p1.heroOptions[0];
+
+    chooseHero(game, "p1", heroId);
+
+    expect(() => chooseHero(game, "p2", heroId)).toThrow("这个武将已经被其他玩家选择。");
+  });
+
   it("creates a dodge response when strike is used and deals damage if target passes", () => {
     const game = setupGame(2);
     const source = activePlayer(game);
@@ -43,6 +58,21 @@ describe("identity card engine", () => {
     expect(game.pending?.kind).toBe("dodge");
 
     passPending(game, target.id);
+    expect(game.pending).toBe(null);
+    expect(target.hp).toBe(target.maxHp - 1);
+  });
+
+  it("automatically skips a pending response when the action timer expires", () => {
+    const game = setupGame(2);
+    const source = activePlayer(game);
+    const target = firstEnemy(game, source.id);
+    const strike = testCard("strike", "杀");
+    source.hand.push(strike);
+
+    playCard(game, source.id, strike.id, target.id);
+    refreshActionDeadline(game, 1_000);
+    resolveTimedAction(game, 11_000);
+
     expect(game.pending).toBe(null);
     expect(target.hp).toBe(target.maxHp - 1);
   });
@@ -131,6 +161,87 @@ describe("identity card engine", () => {
     expect(game.pending?.kind).toBe("dodge");
     expect(source.strikesUsed).toBe(2);
   });
+
+  it("applies wine bonus to the next strike and records a shared effect", () => {
+    const game = setupGame(2);
+    const source = activePlayer(game);
+    const target = firstEnemy(game, source.id);
+    source.heroId = "cao-cao";
+    const wine = testCard("wine", "烈酒", "heart");
+    const strike = testCard("strike", "杀");
+    source.hand.push(wine, strike);
+
+    playCard(game, source.id, wine.id);
+    expect(source.strikeDamageBonus).toBe(1);
+    expect(game.latestEffect?.title).toBe("烈酒");
+
+    playCard(game, source.id, strike.id, target.id);
+    passPending(game, target.id);
+
+    expect(target.hp).toBe(target.maxHp - 2);
+  });
+
+  it("requires two dodges against Lu Bu strike", () => {
+    const game = setupGame(2);
+    const source = activePlayer(game);
+    const target = firstEnemy(game, source.id);
+    source.heroId = "lv-bu";
+    const strike = testCard("strike", "杀");
+    const firstDodge = testCard("dodge", "闪");
+    const secondDodge = testCard("dodge", "闪");
+    source.hand.push(strike);
+    target.hand.push(firstDodge, secondDodge);
+
+    playCard(game, source.id, strike.id, target.id);
+    expect(game.pending?.kind).toBe("dodge");
+    if (game.pending?.kind !== "dodge") throw new Error("expected dodge pending");
+    expect(game.pending.required).toBe(2);
+
+    respondToPending(game, target.id, firstDodge.id);
+    expect(game.pending?.kind).toBe("dodge");
+    if (game.pending?.kind !== "dodge") throw new Error("expected dodge pending");
+    expect(game.pending.received).toBe(1);
+
+    respondToPending(game, target.id, secondDodge.id);
+    expect(game.pending).toBe(null);
+    expect(target.hp).toBe(target.maxHp);
+  });
+
+  it("uses Zhang Liao active skill and records a skill effect", () => {
+    const game = setupGame(2);
+    const source = activePlayer(game);
+    const target = firstEnemy(game, source.id);
+    source.heroId = "zhang-liao";
+    source.skillUsed = false;
+    target.hand.push(testCard("dodge", "闪"));
+    const targetHandBefore = target.hand.length;
+
+    useHeroSkill(game, source.id, [], target.id);
+
+    expect(target.hand.length).toBe(targetHandBefore - 1);
+    expect(source.hand.length).toBeGreaterThan(0);
+    expect(game.latestEffect?.kind).toBe("skill");
+    expect(game.latestEffect?.title).toBe("突袭");
+  });
+
+  it("automatically advances play and discard stages when the action timer expires", () => {
+    const game = setupGame(2);
+    const firstPlayerId = game.activePlayerId!;
+    const firstPlayer = game.players[firstPlayerId];
+    firstPlayer.hand.push(testCard("dodge", "闪"), testCard("dodge", "闪"));
+
+    refreshActionDeadline(game, 1_000);
+    resolveTimedAction(game, 11_000);
+
+    expect(game.activePlayerId).toBe(firstPlayerId);
+    expect(game.stage).toBe("discard");
+
+    refreshActionDeadline(game, 12_000);
+    resolveTimedAction(game, 22_000);
+
+    expect(game.activePlayerId).not.toBe(firstPlayerId);
+    expect(game.stage).toBe("play");
+  });
 });
 
 function setupGame(playerCount: number) {
@@ -141,7 +252,10 @@ function setupGame(playerCount: number) {
   }
   startHeroSelect(game, "p1");
   game.playerOrder.forEach((id) => {
-    chooseHero(game, id, game.players[id].heroOptions[0]);
+    const taken = new Set(game.playerOrder.map((playerId) => game.players[playerId].heroId).filter(Boolean));
+    const heroId = game.players[id].heroOptions.find((option) => !taken.has(option));
+    expect(heroId).toBeTruthy();
+    chooseHero(game, id, heroId!);
   });
   return game;
 }
@@ -158,11 +272,12 @@ function firstEnemy(game: GameState, sourceId: string) {
 }
 
 function testCard(key: GameCard["key"], name: string, suit: GameCard["suit"] = "spade"): GameCard {
+  const basicKeys = new Set(["strike", "dodge", "peach", "wine"]);
   return {
     id: `test-${key}-${Math.random()}`,
     key,
     name,
-    type: key === "strike" || key === "dodge" || key === "peach" ? "basic" : "trick",
+    type: basicKeys.has(key) ? "basic" : "trick",
     suit,
     color: suit === "heart" || suit === "diamond" ? "red" : "black",
     rank: "A",

@@ -10,6 +10,7 @@ export type CardType = "basic" | "trick" | "equip";
 export type EquipmentSlot = "weapon" | "armor";
 export type HeroSkillKind = "active" | "passive" | "conversion";
 export type CardUseAs = "strike" | "dodge" | "peach";
+export type GameEffectKind = "card" | "skill" | "response" | "damage" | "heal" | "equip";
 
 export interface HeroDef {
   id: string;
@@ -80,6 +81,7 @@ export interface PlayerState {
   hand: GameCard[];
   equipment: Partial<Record<EquipmentSlot, GameCard>>;
   strikesUsed: number;
+  strikeDamageBonus: number;
   skillUsed: boolean;
   armorBlockedThisTurn: boolean;
   ready: boolean;
@@ -97,6 +99,9 @@ export interface DodgePending {
   sourceId: PlayerId;
   targetId: PlayerId;
   cardName: string;
+  required: number;
+  received: number;
+  damage: number;
 }
 
 export interface DuelPending {
@@ -132,6 +137,16 @@ export type ResumeAction =
   | { kind: "continueAoe"; aoe: AoePending }
   | { kind: "endDuel" };
 
+export interface GameEffect {
+  id: string;
+  kind: GameEffectKind;
+  sourceId: PlayerId | null;
+  targetId: PlayerId | null;
+  title: string;
+  text: string;
+  at: number;
+}
+
 export interface GameState {
   roomCode: string;
   mode: GameModeId;
@@ -144,6 +159,9 @@ export interface GameState {
   pending: PendingAction | null;
   deck: GameCard[];
   discardPile: GameCard[];
+  heroSelectEndsAt: number | null;
+  actionDeadlineAt: number | null;
+  latestEffect: GameEffect | null;
   turnNumber: number;
   startedAt: number | null;
   winner: string | null;
@@ -166,6 +184,7 @@ export interface PublicPlayerView {
   handCount: number;
   equipment: Partial<Record<EquipmentSlot, GameCard>>;
   strikesUsed: number;
+  strikeDamageBonus: number;
   skillUsed: boolean;
   armorBlockedThisTurn: boolean;
   ready: boolean;
@@ -187,6 +206,10 @@ export interface GameView {
   hostId: PlayerId | null;
   activePlayerId: PlayerId | null;
   pending: PendingAction | null;
+  heroSelectEndsAt: number | null;
+  actionDeadlineAt: number | null;
+  serverNow: number;
+  latestEffect: GameEffect | null;
   deckCount: number;
   discardCount: number;
   turnNumber: number;
